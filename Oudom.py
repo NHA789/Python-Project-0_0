@@ -688,19 +688,19 @@ def view_inc_exsp(user_id):
     df = pd.read_csv(TRANS)
     df["Date"] = pd.to_datetime(df["Date"]).dt.date
     today = datetime.today().date()
-    start_date = today - timedelta(days=6)  
+    start_date = today - timedelta(days=6)  # Last 7 days including today
 
-    # while True:
-    #     user_id = input("Enter user ID to view transaction history: ")
-    #     if user_id not in df["Sender_id"].astype(str).values and user_id not in df["Receiver_id"].astype(str).values:
-    #         print("User ID not found in transaction history. Try again.")
-    #     else:
-    #         break
+    while True:
+        user_id = input("Enter user ID to view transaction history: ")
+        if user_id not in df["Sender_id"].astype(str).values and user_id not in df["Receiver_id"].astype(str).values:
+            print("User ID not found in transaction history. Try again.")
+        else:
+            break
 
     filtered_df = df[(df["Date"] >= start_date) & 
                      ((df["Sender_id"].astype(str) == user_id) | (df["Receiver_id"].astype(str) == user_id))]
 
-    filtered_df["Transaction_Category"] = "Spent"  
+    filtered_df["Transaction_Category"] = "Spent"  # Default to Spent
     filtered_df.loc[filtered_df["Receiver_id"].astype(str) == user_id, "Transaction_Category"] = "Income"
     filtered_df.loc[(filtered_df["Transaction_type"] == "Withdraw") & 
                     (filtered_df["Sender_id"].astype(str) == user_id), "Transaction_Category"] = "Spent"
@@ -708,7 +708,7 @@ def view_inc_exsp(user_id):
                     (filtered_df["Receiver_id"].astype(str) == user_id), "Transaction_Category"] = "Income"
 
     grouped_df = filtered_df.groupby(["Date", "Transaction_Category"])["Amount($)"].sum().unstack(fill_value=0)
-    print(grouped_df) 
+    print(grouped_df)
 
     date_range = [start_date + timedelta(days=i) for i in range(7)]
     grouped_df = grouped_df.reindex(date_range, fill_value=0)
@@ -718,9 +718,8 @@ def view_inc_exsp(user_id):
     plt.xlabel("Date")
     plt.ylabel("Amount ($)")
     plt.xticks(rotation=45)
+    plt.legend(["Income", "Expense"])
     plt.show()
-
-
 
 def view_inc_exsp_gui(root):
     def on_search_button_click():
@@ -741,44 +740,28 @@ def view_inc_exsp_gui(root):
 
         if user_id not in df["Sender_id"].astype(str).values and user_id not in df["Receiver_id"].astype(str).values:
             messagebox.showwarning("User Not Found", "User ID not found in transaction history.")
-        else:
-            
-            df["Date"] = pd.to_datetime(df["Date"]).dt.date  
-            today = datetime.today().date()
-            start_date = today - timedelta(days=6) 
+            return
+        
+        df["Date"] = pd.to_datetime(df["Date"]).dt.date  
+        today = datetime.today().date()
+        start_date = today - timedelta(days=6) 
 
-            filtered_df = df[(df["Date"] >= start_date) & 
-                             ((df["Sender_id"].astype(str) == user_id) | (df["Receiver_id"].astype(str) == user_id))]
+        filtered_df = df[(df["Date"] >= start_date) & 
+                         ((df["Sender_id"].astype(str) == user_id) | (df["Receiver_id"].astype(str) == user_id))]
 
-            filtered_df["Transaction_Category"] = "Spent" 
-            filtered_df.loc[filtered_df["Receiver_id"].astype(str) == user_id, "Transaction_Category"] = "Income"
-            filtered_df.loc[(filtered_df["Transaction_type"] == "Withdraw") & 
-                            (filtered_df["Sender_id"].astype(str) == user_id), "Transaction_Category"] = "Spent"
-            filtered_df.loc[(filtered_df["Transaction_type"] == "Deposit") & 
-                            (filtered_df["Receiver_id"].astype(str) == user_id), "Transaction_Category"] = "Income"
+        filtered_df["Transaction_Category"] = "Spent" 
+        filtered_df.loc[filtered_df["Receiver_id"].astype(str) == user_id, "Transaction_Category"] = "Income"
+        filtered_df.loc[(filtered_df["Transaction_type"] == "Withdraw") & 
+                        (filtered_df["Sender_id"].astype(str) == user_id), "Transaction_Category"] = "Spent"
+        filtered_df.loc[(filtered_df["Transaction_type"] == "Deposit") & 
+                        (filtered_df["Receiver_id"].astype(str) == user_id), "Transaction_Category"] = "Income"
 
-            grouped_df = filtered_df.groupby(["Date", "Transaction_Category"])["Amount($)"].sum().unstack(fill_value=0)
+        # Create the grouped DataFrame for plotting and treeview
+        grouped_df = filtered_df.groupby(["Date", "Transaction_Category"])["Amount($)"].sum().unstack(fill_value=0)
+        date_range = [start_date + timedelta(days=i) for i in range(7)]
+        grouped_df = grouped_df.reindex(date_range, fill_value=0)
 
-            root = tk.Tk()
-            root.geometry("800x500")
-            transactions = view_trans_history(user_id)
-
-            tree = ttk.Treeview(root, columns=("Date", "Transaction_Category", "Income", "Spent"), show="headings")
-
-            tree.heading("Date", text="Date")
-            tree.heading("Transaction_Category", text="Transaction Category")
-            tree.heading("Income", text="Income ($)")
-            tree.heading("Spent", text="Spent ($)")
-
-            for index, row in grouped_df.iterrows():
-                transaction_category = "Income" if row["Income"] > 0 else "Spent"
-                tree.insert("", "end", values=(index, transaction_category, row["Income"], row["Spent"]))
-
-            tree.pack(pady=20)
-
-            back_button = tk.Button(root, text="Back", command=lambda: root.destroy(), width=20)
-            back_button.pack(pady=10)
-
+        # Plotting
         grouped_df.plot(kind='bar', color=['green', 'red'])
         plt.title(f"Income vs Expense for User {user_id} (Last 7 Days)")
         plt.xlabel("Date")
@@ -787,6 +770,23 @@ def view_inc_exsp_gui(root):
         plt.show()
 
 
+        root = tk.Tk()
+        root.geometry("800x500")
+
+        tree = ttk.Treeview(root, columns=("Date", "Transaction_Category", "Income", "Spent"), show="headings")
+        tree.heading("Date", text="Date")
+        tree.heading("Transaction_Category", text="Transaction Category")
+        tree.heading("Income", text="Income ($)")
+        tree.heading("Spent", text="Spent ($)")
+
+        for index, row in grouped_df.iterrows():
+            transaction_category = "Income" if row["Income"] > 0 else "Spent"
+            tree.insert("", "end", values=(index, transaction_category, row["Income"], row["Spent"]))
+
+        tree.pack(pady=20)
+
+        back_button = tk.Button(root, text="Back", command=lambda: root.destroy(), width=20)
+        back_button.pack(pady=10)
 
     user_id_label = tk.Label(root, text="Enter User ID:")
     user_id_label.pack(pady=5)
@@ -864,3 +864,4 @@ root.geometry("400x500")
 
 show_menu(root)  
 root.mainloop()
+
